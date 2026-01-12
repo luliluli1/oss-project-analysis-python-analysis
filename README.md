@@ -12,7 +12,7 @@
 ## 项目结构
 - src/: 源代码
 - data/: 原始数据
-- results/: 分析结果与图表
+- results/: 分析结果与
 - docs/: 项目文档
 - tests/: 测试代码
 

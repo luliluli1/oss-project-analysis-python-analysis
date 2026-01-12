@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 import os
 from datetime import datetime
@@ -11,9 +12,9 @@ import ast
 from collections import Counter
 
 # 设置 matplotlib 支持中文
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'sans-serif']
-plt.rcParams['axes.unicode_minus'] = False  # 正常显示负号
-sns.set_style("whitegrid")
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'KaiTi', 'Arial Unicode MS']
+mpl.rcParams['axes.unicode_minus'] = False
 
 def robust_date_parser(date_str):
     """健壮的日期解析函数，处理各种可能的日期格式"""
