@@ -3,8 +3,21 @@ import pandas as pd
 from datetime import datetime
 import os
 import subprocess
-import json
-from tqdm import tqdm  # 修正：使用正确的导入方式
+import sys
+from tqdm import tqdm
+
+def collect_commit_data(repo_path, output_path):
+    """
+    收集Git仓库的提交历史数据（主函数）
+    
+    Args:
+        repo_path (str): 仓库路径
+        output_path (str): 输出CSV文件路径
+    
+    Returns:
+        pd.DataFrame: 包含提交数据的DataFrame
+    """
+    return collect_commit_data_robust(repo_path, output_path)
 
 def collect_commit_data_robust(repo_path, output_path):
     """
@@ -30,7 +43,7 @@ def collect_commit_data_robust(repo_path, output_path):
     current_commit = {}
     file_changes = []
     
-    for line in tqdm(log_output.split('\n'), desc="处理提交"):  # 现在正确使用 tqdm
+    for line in tqdm(log_output.split('\n'), desc="处理提交"):
         if not line.strip():
             continue
             
@@ -106,7 +119,7 @@ def collect_commit_data_safe(repo_path, output_path):
     skipped = 0
     
     print("收集提交数据中 (安全模式)...")
-    for i, commit in enumerate(tqdm(commits, desc="处理提交"), 1):  # 现在正确使用 tqdm
+    for i, commit in enumerate(tqdm(commits, desc="处理提交"), 1):
         try:
             # 尝试获取统计信息
             try:
@@ -170,16 +183,6 @@ def collect_commit_data_safe(repo_path, output_path):
     return df
 
 if __name__ == "__main__":
-    # 安装必要的依赖
-    try:
-        from tqdm import tqdm
-    except ImportError:
-        print("❌ tqdm 未安装，正在安装...")
-        import sys
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
-        from tqdm import tqdm
-    
     # 配置路径
     REPO_PATH = "data/repos/requests"  # 从项目根目录运行
     OUTPUT_PATH = "data/processed/requests_commits.csv"

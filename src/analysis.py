@@ -9,8 +9,9 @@ import re
 import json
 import sys
 import ast
+import shutil  # 修复：导入缺失的shutil模块
 from collections import Counter
-import shutil  
+
 # 设置 matplotlib 支持中文
 mpl.rcParams['font.family'] = 'sans-serif'
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'KaiTi', 'Arial Unicode MS']
@@ -41,11 +42,32 @@ def robust_date_parser(date_str):
         # 最终尝试：使用 pandas 自动推断
         return pd.to_datetime(date_str, errors='coerce')
 
+def save_figure(output_dir, figure_name):
+    """保存图表并验证"""
+    file_path = os.path.join(output_dir, figure_name)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    # 验证文件是否保存成功
+    assert os.path.exists(file_path), f"保存失败: {file_path}"
+    file_size = os.path.getsize(file_path)
+    assert file_size > 0, f"文件为空: {file_path}"
+    print(f"✅ 保存: {figure_name} (大小: {file_size} bytes)")
+    return file_path
+
 def analyze_commit_patterns(input_path, output_dir):
     """
     分析提交模式并生成图表和报告
     """
-    if os.path.exists(output_dir) and any(os.scandir(output_dir)):
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"\n{'📁 路径信息':-^60}")
+    print(f"输入路径: {os.path.abspath(input_path)}")
+    print(f"输出目录: {os.path.abspath(output_dir)}")
+    print(f"当前工作目录: {os.getcwd()}")
+    
+    # =============== 0. 备份旧结果 ===============
+    if os.path.exists(output_dir) and os.path.isdir(output_dir) and any(os.scandir(output_dir)):
         print(f"\n{'🛡️  备份旧结果':-^60}")
         
         # 创建带时间戳的备份目录
@@ -73,17 +95,11 @@ def analyze_commit_patterns(input_path, output_dir):
     else:
         print(f"\n{'✅ 目录已干净，无需清理':-^60}")
     
-
-    print(f"{'=' * 60}")
-    print(f"🚀 开始分析 GitHub 项目提交历史")
-    print(f"   数据源: {input_path}")
-    print(f"{'=' * 60}")
-    
-    # 验证输入文件
+    # =============== 1. 验证输入文件 ===============
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"❌ 数据文件不存在: {input_path}")
     
-    # =============== 1. 加载和验证数据 ===============
+    # =============== 2. 加载和验证数据 ===============
     print(f"\n{'📊 数据加载与验证':-^60}")
     try:
         # 尝试不同的编码
@@ -130,7 +146,7 @@ def analyze_commit_patterns(input_path, output_dir):
         print(f"❌ 数据加载失败: {str(e)}")
         raise
     
-    # =============== 2. 日期处理 ===============
+    # =============== 3. 日期处理 ===============
     print(f"\n{'🕒 日期处理':-^60}")
     try:
         # 保存原始日期用于调试
@@ -172,9 +188,6 @@ def analyze_commit_patterns(input_path, output_dir):
     except Exception as e:
         print(f"❌ 日期处理失败: {str(e)}")
         raise
-    
-    # =============== 3. 创建输出目录 ===============
-    os.makedirs(output_dir, exist_ok=True)
     
     # =============== 4. 多维度分析 ===============
     print(f"\n{'📈 多维度分析':-^60}")
@@ -280,10 +293,7 @@ def analyze_commit_patterns(input_path, output_dir):
             if v > 0:
                 ax.text(i, v + 0.5, str(int(v)), ha='center', va='bottom', fontsize=12, fontweight='bold')
         
-        plt.tight_layout()
-        plt.savefig(f"{output_dir}/weekday_distribution.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ 生成: weekday_distribution.png")
+        save_figure(output_dir, "weekday_distribution.png")
     except Exception as e:
         print(f"❌ 生成星期分布图失败: {str(e)}")
     
@@ -318,10 +328,7 @@ def analyze_commit_patterns(input_path, output_dir):
                 color='red', fontweight='bold', fontsize=12)
         
         plt.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(f"{output_dir}/hourly_distribution.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ 生成: hourly_distribution.png")
+        save_figure(output_dir, "hourly_distribution.png")
     except Exception as e:
         print(f"❌ 生成小时分布图失败: {str(e)}")
     
@@ -355,10 +362,7 @@ def analyze_commit_patterns(input_path, output_dir):
         for i, v in enumerate(top_authors.values):
             ax.text(v + 0.5, i, str(int(v)), va='center', fontsize=11)
         
-        plt.tight_layout()
-        plt.savefig(f"{output_dir}/contributors_distribution.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ 生成: contributors_distribution.png")
+        save_figure(output_dir, "contributors_distribution.png")
     except Exception as e:
         print(f"❌ 生成贡献者分布图失败: {str(e)}")
     
@@ -406,10 +410,7 @@ def analyze_commit_patterns(input_path, output_dir):
         ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=12)
         
         plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(f"{output_dir}/monthly_trends.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ 生成: monthly_trends.png")
+        save_figure(output_dir, "monthly_trends.png")
     except Exception as e:
         print(f"❌ 生成月度趋势图失败: {str(e)}")
     
@@ -436,10 +437,7 @@ def analyze_commit_patterns(input_path, output_dir):
             plt.title('提交消息类型分布', fontsize=18, fontweight='bold', pad=20)
             plt.axis('equal')
             
-            plt.tight_layout()
-            plt.savefig(f"{output_dir}/message_types_pie.png", dpi=300, bbox_inches='tight')
-            plt.close()
-            print("✅ 生成: message_types_pie.png")
+            save_figure(output_dir, "message_types_pie.png")
     except Exception as e:
         print(f"❌ 生成提交消息类型图失败: {str(e)}")
     
@@ -486,10 +484,7 @@ def analyze_commit_patterns(input_path, output_dir):
                 plt.text(bar.get_x() + bar.get_width()/2., height + 0.5,
                         f'{int(height)}', ha='center', va='bottom', fontsize=11)
             
-            plt.tight_layout()
-            plt.savefig(f"{output_dir}/code_structure_analysis.png", dpi=300, bbox_inches='tight')
-            plt.close()
-            print("✅ 生成: code_structure_analysis.png (使用 ast 库)")
+            save_figure(output_dir, "code_structure_analysis.png")
     except Exception as e:
         print(f"⚠️  ast 分析失败（正常，因为需要真实代码变更数据）: {str(e)}")
         print("💡 提示: 在大作业中，您可以分析真实项目的代码变更模式")
@@ -500,7 +495,7 @@ def analyze_commit_patterns(input_path, output_dir):
         
         print("🔍 使用 pysnooper 库进行动态分析...")
         
-        @pysnooper.snoop(f"{output_dir}/pysnooper_analysis.log", depth=1)
+        @pysnooper.snoop(os.path.join(output_dir, "pysnooper_analysis.log"), depth=1)
         def analyze_contributor_patterns(authors, commits):
             """使用 pysnooper 跟踪贡献者模式分析过程"""
             # 模拟贡献者分析
@@ -518,7 +513,7 @@ def analyze_commit_patterns(input_path, output_dir):
         # 执行分析
         if len(df) > 0:
             contributor_patterns = analyze_contributor_patterns(df['author'].values, df)
-            print("✅ 生成: pysnooper_analysis.log (使用 pysnooper 库)")
+            print(f"✅ 生成: pysnooper_analysis.log (使用 pysnooper 库)")
             
             # 从日志中提取关键信息用于报告
             pysnooper_summary = "成功使用 pysnooper 跟踪贡献者分析过程，识别出提交模式特征"
@@ -725,10 +720,11 @@ def analyze_commit_patterns(input_path, output_dir):
     generated_files = os.listdir(output_dir)
     print(f"生成的文件 ({len(generated_files)}):")
     for file in generated_files:
-        print(f"  - {file}")
+        file_path = os.path.join(output_dir, file)
+        print(f"  - {file} (大小: {os.path.getsize(file_path)} bytes)")
     
     print(f"\n{'🎉 分析完成!':-^60}")
-    print(f"结果保存在: {output_dir}")
+    print(f"结果保存在: {os.path.abspath(output_dir)}")
     print(f"建议下一步: 查看 analysis_report.md 获取详细洞察")
     
     return df
