@@ -1,0 +1,96 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, code ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  test:
+    runs-on: windows-latest
+    
+    defaults:
+      run:
+        shell: powershell
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1  # 减少克隆深度
+        submodules: false  # 关键：禁用子模块处理
+        persist-credentials: false  # 避免权限问题
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+    
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        .\venv\Scripts\activate
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-html coverage GitPython
+    
+    - name: Setup directory structure
+      run: |
+        mkdir -p data\repos
+        mkdir -p reports\test\{coverage,html}
+    
+    - name: Clone requests repository
+      run: |
+        .\venv\Scripts\activate
+        python src\setup_repo.py
+      env:
+        GIT_CONFIG_NOSYSTEM: 1  # 避免系统 Git 配置干扰
+    
+    - name: Run project tests
+      run: |
+        .\venv\Scripts\activate
+        Write-Host "=== 运行项目测试 ==="
+        pytest -v tests/ --cov=src --cov-report=html:reports\test\coverage --cov-report=term-missing --html=reports\test\html\report.html --self-contained-html
+    
+    - name: Verify reports
+      id: verify_reports
+      run: |
+        $htmlReport = "reports\test\html\report.html"
+        $coverageIndex = "reports\test\coverage\index.html"
+        
+        if (-Not (Test-Path $htmlReport)) {
+            Write-Host "❌ HTML报告未生成: $htmlReport"
+            Write-Host "=== 项目结构 ==="
+            Get-ChildItem -Recurse | Where-Object { $_.Name -like "*report*" -or $_.Name -like "*.html" } | Format-Table -AutoSize
+            exit 1
+        }
+        
+        if (-Not (Test-Path $coverageIndex)) {
+            Write-Host "❌ 覆盖率报告未生成: $coverageIndex"
+            Write-Host "=== 覆盖率目录内容 ==="
+            Get-ChildItem reports\test\coverage -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            exit 1
+        }
+        
+        Write-Host "✅ 所有报告生成成功!"
+        Write-Host "::set-output name=reports_exist::true"
+    
+    - name: Upload HTML test report
+      uses: actions/upload-artifact@v4  # 使用v4版本（v3将于2025年1月30日弃用）
+      if: always()
+      with:
+        name: test-report-html
+        path: reports/test/html/report.html
+        retention-days: 1
+    
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4  # 使用v4版本
+      if: always()
+      with:
+        name: coverage-report
+        path: reports/test/coverage/
+        retention-days: 1
+        compression-level: 3
