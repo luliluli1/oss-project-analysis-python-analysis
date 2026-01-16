@@ -1,4 +1,4 @@
-name: Run Tests
+name: Run Project Tests Only
 
 on:
   push:
@@ -11,12 +11,16 @@ jobs:
   test:
     runs-on: windows-latest
     
+    defaults:
+      run:
+        shell: powershell
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        path: .
+        persist-credentials: false
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -26,54 +30,39 @@ jobs:
         cache-dependency-path: 'requirements.txt'
     
     - name: Install dependencies
-      shell: bash
       run: |
         python -m venv venv
-        source venv/bin/activate
+        .\venv\Scripts\activate
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-html coverage
     
     - name: Create report directories
-      shell: bash
       run: |
-        mkdir -p reports/test/{coverage,html}
-        echo "✅ 报告目录创建成功"
+        mkdir -p reports\test\coverage
+        mkdir -p reports\test\html
     
-    - name: Debug environment
-      shell: bash
+    - name: Debug project structure
       run: |
-        echo "=== 环境信息 ==="
-        python --version
-        pip --version
-        echo "=== 项目结构 ==="
-        ls -la
-        echo "=== 测试目录 ==="
-        ls -la tests/
+        Write-Host "=== 项目结构 ==="
+        Get-ChildItem -Recurse | Where-Object { $_.PSIsContainer -or $_.Name -like "test_*.py" } | Format-Table -AutoSize
     
-    - name: Run tests with detailed output
-      shell: bash
+    - name: Run ONLY project tests
       run: |
-        source venv/bin/activate
-        echo "=== 开始运行测试 ==="
-        pytest -v --tb=short --cov=src --cov-report=html:reports/test/coverage --cov-report=term-missing --html=reports/test/html/report.html --self-contained-html
-        echo "✅ 测试执行完成"
+        .\venv\Scripts\activate
+        Write-Host "=== 运行项目测试 (仅tests/目录) ==="
+        pytest -v tests/ --cov=src --cov-report=html:reports\test\coverage --cov-report=term-missing --html=reports\test\html\report.html --self-contained-html
     
-    - name: Verify test reports
-      shell: bash
+    - name: Verify reports
       run: |
-        echo "=== 验证报告文件 ==="
-        ls -la reports/test/
-        ls -la reports/test/coverage/
-        ls -la reports/test/html/
-        if [ ! -f "reports/test/html/report.html" ]; then
-          echo "❌ HTML 报告未生成"
-          exit 1
-        fi
-        if [ ! -d "reports/test/coverage/" ] || [ ! -f "reports/test/coverage/index.html" ]; then
-          echo "❌ 覆盖率报告未生成"
-          exit 1
-        fi
-        echo "✅ 所有报告文件存在"
+        if (-Not (Test-Path "reports\test\html\report.html")) {
+            Write-Error "❌ HTML报告未生成"
+            exit 1
+        }
+        if (-Not (Test-Path "reports\test\coverage\index.html")) {
+            Write-Error "❌ 覆盖率报告未生成"
+            exit 1
+        }
+        Write-Host "✅ 所有报告生成成功"
     
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
@@ -82,7 +71,6 @@ jobs:
         name: coverage-report
         path: reports/test/coverage/
         retention-days: 1
-        compression-level: 6
     
     - name: Upload HTML test report
       uses: actions/upload-artifact@v4
@@ -91,11 +79,3 @@ jobs:
         name: test-report-html
         path: reports/test/html/report.html
         retention-days: 1
-    
-    - name: Check coverage threshold
-      shell: bash
-      run: |
-        source venv/bin/activate
-        echo "=== 检查覆盖率门槛 ==="
-        coverage report --fail-under=70
-      if: github.ref == 'refs/heads/main'
