@@ -5,16 +5,18 @@ on:
     branches: [ main, code ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 获取完整历史
+        fetch-depth: 0
+        path: .
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -24,17 +26,55 @@ jobs:
         cache-dependency-path: 'requirements.txt'
     
     - name: Install dependencies
+      shell: bash
       run: |
         python -m venv venv
-        .\venv\Scripts\activate
+        source venv/bin/activate
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-html coverage
-        
-    - name: Run tests
+    
+    - name: Create report directories
+      shell: bash
       run: |
-        .\venv\Scripts\activate
-        pytest
-        
+        mkdir -p reports/test/{coverage,html}
+        echo "✅ 报告目录创建成功"
+    
+    - name: Debug environment
+      shell: bash
+      run: |
+        echo "=== 环境信息 ==="
+        python --version
+        pip --version
+        echo "=== 项目结构 ==="
+        ls -la
+        echo "=== 测试目录 ==="
+        ls -la tests/
+    
+    - name: Run tests with detailed output
+      shell: bash
+      run: |
+        source venv/bin/activate
+        echo "=== 开始运行测试 ==="
+        pytest -v --tb=short --cov=src --cov-report=html:reports/test/coverage --cov-report=term-missing --html=reports/test/html/report.html --self-contained-html
+        echo "✅ 测试执行完成"
+    
+    - name: Verify test reports
+      shell: bash
+      run: |
+        echo "=== 验证报告文件 ==="
+        ls -la reports/test/
+        ls -la reports/test/coverage/
+        ls -la reports/test/html/
+        if [ ! -f "reports/test/html/report.html" ]; then
+          echo "❌ HTML 报告未生成"
+          exit 1
+        fi
+        if [ ! -d "reports/test/coverage/" ] || [ ! -f "reports/test/coverage/index.html" ]; then
+          echo "❌ 覆盖率报告未生成"
+          exit 1
+        fi
+        echo "✅ 所有报告文件存在"
+    
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       if: always()
@@ -43,7 +83,7 @@ jobs:
         path: reports/test/coverage/
         retention-days: 1
         compression-level: 6
-        
+    
     - name: Upload HTML test report
       uses: actions/upload-artifact@v4
       if: always()
@@ -51,9 +91,11 @@ jobs:
         name: test-report-html
         path: reports/test/html/report.html
         retention-days: 1
-        
+    
     - name: Check coverage threshold
+      shell: bash
       run: |
-        .\venv\Scripts\activate
+        source venv/bin/activate
+        echo "=== 检查覆盖率门槛 ==="
         coverage report --fail-under=70
       if: github.ref == 'refs/heads/main'
