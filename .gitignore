@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# 忽略数据和报告目录
+data/repos/
+reports/test/
+.coverage
+__pycache__/
+*.pyc
