@@ -10,7 +10,7 @@ import json
 import sys
 import ast
 from collections import Counter
-
+import shutil  
 # 设置 matplotlib 支持中文
 mpl.rcParams['font.family'] = 'sans-serif'
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'KaiTi', 'Arial Unicode MS']
@@ -45,6 +45,35 @@ def analyze_commit_patterns(input_path, output_dir):
     """
     分析提交模式并生成图表和报告
     """
+    if os.path.exists(output_dir) and any(os.scandir(output_dir)):
+        print(f"\n{'🛡️  备份旧结果':-^60}")
+        
+        # 创建带时间戳的备份目录
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = f"results/backups/analysis_{timestamp}"
+        os.makedirs(os.path.dirname(backup_dir), exist_ok=True)
+        
+        # 备份旧结果
+        if not os.path.exists(backup_dir):
+            shutil.copytree(output_dir, backup_dir)
+            print(f"✅ 备份成功: {backup_dir}")
+        
+        # 清理旧结果
+        print(f"\n{'🧹 清理旧结果':-^60}")
+        for item in os.listdir(output_dir):
+            item_path = os.path.join(output_dir, item)
+            try:
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                print(f"✅ 清理: {item}")
+            except Exception as e:
+                print(f"⚠️  无法清理 {item}: {str(e)}")
+    else:
+        print(f"\n{'✅ 目录已干净，无需清理':-^60}")
+    
+
     print(f"{'=' * 60}")
     print(f"🚀 开始分析 GitHub 项目提交历史")
     print(f"   数据源: {input_path}")
@@ -228,10 +257,17 @@ def analyze_commit_patterns(input_path, output_dir):
     # =============== 5. 生成可视化图表 ===============
     print(f"\n{'🖼️  生成可视化图表':-^60}")
     
-    # 5.1 星期分布图
+    # 5.1 星期分布图 - 修复 Seaborn API
     try:
         plt.figure(figsize=(12, 7))
-        ax = sns.barplot(x=day_counts.index, y=day_counts.values, palette="viridis")
+        # 修复：添加 hue 和 legend 参数
+        ax = sns.barplot(
+            x=day_counts.index, 
+            y=day_counts.values, 
+            hue=day_counts.index,
+            palette="viridis",
+            legend=False
+        )
         
         plt.title('提交按星期分布', fontsize=18, fontweight='bold', pad=20)
         plt.xlabel('星期', fontsize=14)
@@ -251,10 +287,17 @@ def analyze_commit_patterns(input_path, output_dir):
     except Exception as e:
         print(f"❌ 生成星期分布图失败: {str(e)}")
     
-    # 5.2 小时分布图
+    # 5.2 小时分布图 - 修复 Seaborn API
     try:
         plt.figure(figsize=(14, 7))
-        ax = sns.barplot(x=hour_counts.index, y=hour_counts.values, palette="rocket")
+        # 修复：添加 hue 和 legend 参数
+        ax = sns.barplot(
+            x=hour_counts.index, 
+            y=hour_counts.values, 
+            hue=hour_counts.index,
+            palette="rocket",
+            legend=False
+        )
         
         # 标记工作时间和非工作时间
         work_hours = range(8, 19)  # 8AM to 6PM
@@ -282,7 +325,7 @@ def analyze_commit_patterns(input_path, output_dir):
     except Exception as e:
         print(f"❌ 生成小时分布图失败: {str(e)}")
     
-    # 5.3 贡献者分布图
+    # 5.3 贡献者分布图 - 修复 Seaborn API
     try:
         # 只显示前15名贡献者，其他合并
         top_n = min(15, len(author_counts))
@@ -293,7 +336,14 @@ def analyze_commit_patterns(input_path, output_dir):
             top_authors['其他贡献者'] = other_count
         
         plt.figure(figsize=(14, 10))
-        ax = sns.barplot(y=top_authors.index, x=top_authors.values, palette="coolwarm")
+        # 修复：添加 hue 和 legend 参数
+        ax = sns.barplot(
+            y=top_authors.index, 
+            x=top_authors.values, 
+            hue=top_authors.index,
+            palette="coolwarm",
+            legend=False
+        )
         
         plt.title('贡献者提交数量分布', fontsize=18, fontweight='bold', pad=20)
         plt.xlabel('提交数量', fontsize=14)
@@ -508,7 +558,7 @@ def analyze_commit_patterns(input_path, output_dir):
 # 📊 开源项目提交历史分析报告
 
 ## 📋 项目概览
-- **项目名称**: requests (https://github.com/psf/requests)
+- **项目名称**: requests (https://github.com/psf/requests  )
 - **分析时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - **分析范围**: 最近 {total_commits} 个提交
 - **时间跨度**: {date_range_str}
@@ -631,7 +681,7 @@ def analyze_commit_patterns(input_path, output_dir):
 - pandas 版本: {pd.__version__}
 - matplotlib 版本: {plt.matplotlib.__version__}
 - 分析脚本: src/analysis.py
-- GitHub 仓库: https://github.com/psf/requests
+- GitHub 仓库: https://github.com/psf/requests  
 
 > 💡 **备注**: 本分析基于开源软件基础课程要求，使用课程讲授的开源工具进行深度分析。requests 是一个被 1,000,000+ 仓库依赖的流行库，每周下载量约 3000 万次，是研究开源项目演化的理想案例。
 """
@@ -696,21 +746,31 @@ if __name__ == "__main__":
         print(f"\n{'❌ 分析失败':-^60}")
         print(f"错误: {str(e)}")
         
-        # 生成错误报告
-error_report = (
-f"# ❌ 分析失败报告\n\n"
-f"## 错误信息\n{str(e)}\n\n"
-f"## 调试建议\n"
-f"1. 检查数据文件是否存在: {INPUT_PATH}\n"
-f"2. 验证CSV文件格式是否正确（可用Excel打开）\n"
-f"3. 确保已安装所有依赖: \n"
-f"   ```\n"
-f"   pip install pandas matplotlib seaborn astroid pysnooper\n"
-f"   ```\n"
-f"4. 检查日期格式是否符合预期\n"
-f"5. 查看完整的错误堆栈跟踪\n\n"
-f"## 环境信息\n"
-f"- 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-f"- Python版本: {sys.version}\n"
-f"- 当前目录: {os.getcwd()}\n"
-)
+        # 生成错误报告 - 修复字符串终止问题
+        error_report = (
+            "# ❌ 分析失败报告\n\n"
+            "## 错误信息\n"
+            f"{str(e)}\n\n"
+            "## 调试建议\n"
+            f"1. 检查数据文件是否存在: {INPUT_PATH}\n"
+            "2. 验证CSV文件格式是否正确（可用Excel打开）\n"
+            "3. 确保已安装所有依赖:\n"
+            "   ```\n"
+            "   pip install pandas matplotlib seaborn\n"
+            "   ```\n"
+            "4. 检查日期格式是否符合预期\n"
+            "5. 查看完整的错误堆栈跟踪\n\n"
+            "## 环境信息\n"
+            f"- 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"- Python版本: {sys.version}\n"
+            f"- 当前目录: {os.getcwd()}\n"
+        )
+        
+        # 保存错误报告
+        os.makedirs("results/analysis", exist_ok=True)
+        with open("results/analysis/error_report.md", 'w', encoding='utf-8') as f:
+            f.write(error_report)
+        print("\n📝 已生成错误报告: results/analysis/error_report.md")
+        
+        # 退出码 1 表示失败
+        sys.exit(1)
