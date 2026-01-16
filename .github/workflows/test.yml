@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # 获取完整历史
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -36,18 +36,21 @@ jobs:
         pytest
         
     - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: coverage-report
         path: reports/test/coverage/
+        retention-days: 1
+        compression-level: 6
         
     - name: Upload HTML test report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-report-html
         path: reports/test/html/report.html
+        retention-days: 1
         
     - name: Check coverage threshold
       run: |
