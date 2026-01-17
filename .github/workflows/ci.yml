@@ -35,13 +35,13 @@ jobs:
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
 
-    - name: Install dependencies (with version pinning)
+    - name: Install dependencies
       run: |
-        # 首先安装兼容的 NumPy 版本
+        python -m venv venv
+        .\venv\Scripts\activate
         pip install numpy==1.26.4
-        # 然后安装 pandas 和其他依赖
         pip install -r requirements.txt
-        # 验证安装
+        pip install pytest pytest-cov pytest-html coverage
         python -c "import numpy as np; import pandas as pd; print(f'NumPy {np.__version__}, Pandas {pd.__version__}')"
       shell: powershell
 
@@ -54,35 +54,17 @@ jobs:
 
     - name: Clone requests repository
       run: |
-        python -c @"
-import git
-import os
-import sys
-
-repo_path = 'data/repos/requests'
-if os.path.exists(repo_path):
-    print('INFO: requests repository already exists, skipping clone')
-else:
-    print('INFO: Cloning requests repository with knowledge base parameter...')
-    os.makedirs(repo_path, exist_ok=True)
-    try:
-        # 根据知识库要求
-        result = subprocess.run([
-            'git', 'clone', 
-            '-c', 'fetch.fsck.badTimezone=ignore',
-            '--depth=300', 
-            'https://github.com/psf/requests.git', 
-            repo_path
-        ], capture_output=True, text=True, check=True)
-        print(f'SUCCESS: {result.stdout}')
-    except Exception as e:
-        print(f'ERROR: Clone failed: {str(e)}')
-        sys.exit(1)
-"@
+        if (-not (Test-Path "data\repos\requests")) {
+          echo "INFO: Cloning requests repository with knowledge base parameter..."
+          git clone -c fetch.fsck.badTimezone=ignore --depth=300 https://github.com/psf/requests.git data\repos\requests
+        } else {
+          echo "INFO: requests repository already exists"
+        }
       shell: powershell
 
     - name: Run tests
       run: |
+        .\venv\Scripts\activate
         pytest -v tests/ --cov=src --cov-report=html:reports\test\coverage --html=reports\test\html\report.html --self-contained-html
       shell: powershell
       continue-on-error: true
