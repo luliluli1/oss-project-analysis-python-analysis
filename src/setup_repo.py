@@ -1,6 +1,7 @@
 import git
 import os
 import sys
+import subprocess
 
 def setup_requests_repo():
     """Clone requests repository at runtime with knowledge base parameter"""
@@ -15,24 +16,38 @@ def setup_requests_repo():
     os.makedirs(repo_path, exist_ok=True)
     
     try:
-        # 根据知识库要求：使用特殊参数避免"bad commit timestamp"错误
-        # 根据GitPython文档：需要allow_unsafe_options=True
-        repo = git.Repo.clone_from(
-            "https://github.com/psf/requests.git",
-            repo_path,
-            allow_unsafe_options=True,  # 关键修复：启用不安全选项
-            config={'fetch.fsck.badTimezone': 'ignore'},  # 知识库指定的参数
-            depth=300
-        )
-        commit_count = len(list(repo.iter_commits()))
-        print(f"SUCCESS: Clone successful! Commit count: {commit_count}")
-        return repo
-    except Exception as e:
-        print(f"ERROR: Clone failed: {str(e)}")
+        # 使用 subprocess 直接调用 git 命令（100% 兼容知识库要求）
+        print("EXECUTING: git clone -c fetch.fsck.badTimezone=ignore --depth=300 https://github.com/psf/requests.git data/repos/requests")
+        result = subprocess.run([
+            'git', 'clone', 
+            '-c', 'fetch.fsck.badTimezone=ignore',  # 知识库要求的精确参数
+            '--depth=300', 
+            'https://github.com/psf/requests.git', 
+            repo_path
+        ], capture_output=True, text=True, check=True)
+        
+        print(f"SUCCESS: {result.stdout}")
+        print(f"DEBUG: Repository cloned successfully to {repo_path}")
+        
+        # 验证克隆结果
+        if os.path.exists(os.path.join(repo_path, '.git')):
+            print("SUCCESS: Git repository structure verified")
+            return True
+        else:
+            print("ERROR: Repository structure verification failed")
+            sys.exit(1)
+            
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: Git clone failed with exit code {e.returncode}")
+        print(f"STDOUT: {e.stdout}")
+        print(f"STDERR: {e.stderr}")
         print("TROUBLESHOOTING:")
-        print("1. Check network connectivity")
-        print("2. Ensure GitPython is installed")
-        print("3. Verify disk space")
+        print("1. Check Git installation: git --version")
+        print("2. Verify network connectivity to github.com")
+        print("3. Ensure sufficient disk space")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: Unexpected error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
