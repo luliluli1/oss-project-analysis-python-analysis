@@ -70,7 +70,7 @@ jobs:
         $coverageReport = "reports\test\coverage\index.html"
         
         if (-not (Test-Path $htmlReport)) {
-          @"
+@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -95,7 +95,7 @@ jobs:
         
         if (-not (Test-Path $coverageReport)) {
           mkdir -p reports\test\coverage -Force
-          @"
+@"
 <!DOCTYPE html>
 <html>
 <head>

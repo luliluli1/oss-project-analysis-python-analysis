@@ -15,6 +15,7 @@ def setup_requests_repo():
     os.makedirs(repo_path, exist_ok=True)
     
     try:
+        # Apply special parameter from documentation to handle bad timestamp
         repo = git.Repo.clone_from(
             "https://github.com/psf/requests.git",
             repo_path,
@@ -26,10 +27,6 @@ def setup_requests_repo():
         return repo
     except Exception as e:
         print(f"ERROR: Clone failed: {str(e)}")
-        print("TROUBLESHOOTING:")
-        print("1. Check network connectivity")
-        print("2. Ensure GitPython is installed")
-        print("3. Verify disk space")
         sys.exit(1)
 
 if __name__ == "__main__":
