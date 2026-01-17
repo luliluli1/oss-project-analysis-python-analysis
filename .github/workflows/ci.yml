@@ -39,9 +39,13 @@ jobs:
       run: |
         python -m venv venv
         .\venv\Scripts\activate
+        # 先安装 NumPy 避免二进制兼容问题
         pip install numpy==1.26.4
+        # 安装所有依赖（包含新增的 tqdm）
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-html coverage
+        # 验证关键依赖
+        python -c "import tqdm; print(f'tqdm version: {tqdm.__version__}')"
         python -c "import numpy as np; import pandas as pd; print(f'NumPy {np.__version__}, Pandas {pd.__version__}')"
       shell: powershell
 
