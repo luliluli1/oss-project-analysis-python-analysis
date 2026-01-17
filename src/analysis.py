@@ -9,10 +9,13 @@ import re
 import json
 import sys
 import ast
-import shutil  # 修复：导入缺失的shutil模块
+import shutil
 from collections import Counter
+from pathlib import Path  # 使用 pathlib 处理路径
 
-# 设置 matplotlib 支持中文
+# 关键修复：在导入 matplotlib 后立即设置非交互式后端
+import matplotlib
+matplotlib.use('Agg')  # 必须在导入 pyplot 前设置
 mpl.rcParams['font.family'] = 'sans-serif'
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'KaiTi', 'Arial Unicode MS']
 mpl.rcParams['axes.unicode_minus'] = False
@@ -44,60 +47,87 @@ def robust_date_parser(date_str):
 
 def save_figure(output_dir, figure_name):
     """保存图表并验证"""
-    file_path = os.path.join(output_dir, figure_name)
-    plt.savefig(file_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    # 验证文件是否保存成功
-    assert os.path.exists(file_path), f"保存失败: {file_path}"
-    file_size = os.path.getsize(file_path)
-    assert file_size > 0, f"文件为空: {file_path}"
-    print(f"✅ 保存: {figure_name} (大小: {file_size} bytes)")
-    return file_path
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    file_path = output_path / figure_name
+    
+    try:
+        plt.savefig(str(file_path), dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # 验证文件是否保存成功
+        assert file_path.exists(), f"保存失败: {file_path}"
+        file_size = file_path.stat().st_size
+        assert file_size > 0, f"文件为空: {file_path} (大小: {file_size} bytes)"
+        print(f"✅ 保存: {figure_name} (大小: {file_size} bytes)")
+        return str(file_path)
+    except Exception as e:
+        print(f"❌ 保存图表失败: {str(e)}")
+        # 尝试保存最小版本
+        try:
+            plt.figure(figsize=(4, 3))
+            plt.text(0.5, 0.5, "图表生成失败", ha='center', va='center', fontsize=12)
+            plt.axis('off')
+            
+            fallback_path = output_path / f"fallback_{figure_name}"
+            plt.savefig(str(fallback_path), dpi=100, bbox_inches='tight')
+            plt.close()
+            
+            print(f"✅ 创建备用图表: {fallback_path.name}")
+            return str(fallback_path)
+        except Exception as fallback_e:
+            print(f"❌ 备用图表也失败: {str(fallback_e)}")
+            return None
 
 def analyze_commit_patterns(input_path, output_dir):
     """
     分析提交模式并生成图表和报告
     """
     # 确保输出目录存在
-    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
     
     print(f"\n{'📁 路径信息':-^60}")
-    print(f"输入路径: {os.path.abspath(input_path)}")
-    print(f"输出目录: {os.path.abspath(output_dir)}")
-    print(f"当前工作目录: {os.getcwd()}")
+    print(f"输入路径: {Path(input_path).resolve()}")
+    print(f"输出目录: {output_path.resolve()}")
+    print(f"当前工作目录: {Path.cwd()}")
     
     # =============== 0. 备份旧结果 ===============
-    if os.path.exists(output_dir) and os.path.isdir(output_dir) and any(os.scandir(output_dir)):
+    if output_path.exists() and any(output_path.iterdir()):
         print(f"\n{'🛡️  备份旧结果':-^60}")
         
         # 创建带时间戳的备份目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_dir = f"results/backups/analysis_{timestamp}"
-        os.makedirs(os.path.dirname(backup_dir), exist_ok=True)
+        backup_dir = Path(f"results/backups/analysis_{timestamp}")
+        backup_dir.parent.mkdir(parents=True, exist_ok=True)
         
         # 备份旧结果
-        if not os.path.exists(backup_dir):
-            shutil.copytree(output_dir, backup_dir)
-            print(f"✅ 备份成功: {backup_dir}")
+        if not backup_dir.exists():
+            try:
+                shutil.copytree(str(output_path), str(backup_dir))
+                print(f"✅ 备份成功: {backup_dir}")
+            except Exception as e:
+                print(f"⚠️  备份失败: {str(e)}")
         
         # 清理旧结果
         print(f"\n{'🧹 清理旧结果':-^60}")
-        for item in os.listdir(output_dir):
-            item_path = os.path.join(output_dir, item)
+        for item in output_path.iterdir():
             try:
-                if os.path.isfile(item_path) or os.path.islink(item_path):
-                    os.unlink(item_path)
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                print(f"✅ 清理: {item}")
+                if item.is_file() or item.is_symlink():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(str(item))
+                print(f"✅ 清理: {item.name}")
             except Exception as e:
-                print(f"⚠️  无法清理 {item}: {str(e)}")
+                print(f"⚠️  无法清理 {item.name}: {str(e)}")
     else:
         print(f"\n{'✅ 目录已干净，无需清理':-^60}")
     
     # =============== 1. 验证输入文件 ===============
-    if not os.path.exists(input_path):
-        raise FileNotFoundError(f"❌ 数据文件不存在: {input_path}")
+    input_file = Path(input_path)
+    if not input_file.exists():
+        raise FileNotFoundError(f"❌ 数据文件不存在: {input_file.resolve()}")
     
     # =============== 2. 加载和验证数据 ===============
     print(f"\n{'📊 数据加载与验证':-^60}")
@@ -108,7 +138,7 @@ def analyze_commit_patterns(input_path, output_dir):
         
         for encoding in encodings:
             try:
-                df = pd.read_csv(input_path, encoding=encoding)
+                df = pd.read_csv(str(input_file), encoding=encoding)
                 print(f"✅ 使用编码 '{encoding}' 成功加载数据")
                 break
             except Exception as e:
@@ -293,7 +323,7 @@ def analyze_commit_patterns(input_path, output_dir):
             if v > 0:
                 ax.text(i, v + 0.5, str(int(v)), ha='center', va='bottom', fontsize=12, fontweight='bold')
         
-        save_figure(output_dir, "weekday_distribution.png")
+        save_figure(str(output_path), "weekday_distribution.png")
     except Exception as e:
         print(f"❌ 生成星期分布图失败: {str(e)}")
     
@@ -328,7 +358,7 @@ def analyze_commit_patterns(input_path, output_dir):
                 color='red', fontweight='bold', fontsize=12)
         
         plt.grid(axis='y', alpha=0.3)
-        save_figure(output_dir, "hourly_distribution.png")
+        save_figure(str(output_path), "hourly_distribution.png")
     except Exception as e:
         print(f"❌ 生成小时分布图失败: {str(e)}")
     
@@ -362,7 +392,7 @@ def analyze_commit_patterns(input_path, output_dir):
         for i, v in enumerate(top_authors.values):
             ax.text(v + 0.5, i, str(int(v)), va='center', fontsize=11)
         
-        save_figure(output_dir, "contributors_distribution.png")
+        save_figure(str(output_path), "contributors_distribution.png")
     except Exception as e:
         print(f"❌ 生成贡献者分布图失败: {str(e)}")
     
@@ -410,7 +440,7 @@ def analyze_commit_patterns(input_path, output_dir):
         ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=12)
         
         plt.grid(True, alpha=0.3)
-        save_figure(output_dir, "monthly_trends.png")
+        save_figure(str(output_path), "monthly_trends.png")
     except Exception as e:
         print(f"❌ 生成月度趋势图失败: {str(e)}")
     
@@ -437,7 +467,7 @@ def analyze_commit_patterns(input_path, output_dir):
             plt.title('提交消息类型分布', fontsize=18, fontweight='bold', pad=20)
             plt.axis('equal')
             
-            save_figure(output_dir, "message_types_pie.png")
+            save_figure(str(output_path), "message_types_pie.png")
     except Exception as e:
         print(f"❌ 生成提交消息类型图失败: {str(e)}")
     
@@ -484,7 +514,7 @@ def analyze_commit_patterns(input_path, output_dir):
                 plt.text(bar.get_x() + bar.get_width()/2., height + 0.5,
                         f'{int(height)}', ha='center', va='bottom', fontsize=11)
             
-            save_figure(output_dir, "code_structure_analysis.png")
+            save_figure(str(output_path), "code_structure_analysis.png")
     except Exception as e:
         print(f"⚠️  ast 分析失败（正常，因为需要真实代码变更数据）: {str(e)}")
         print("💡 提示: 在大作业中，您可以分析真实项目的代码变更模式")
@@ -495,13 +525,13 @@ def analyze_commit_patterns(input_path, output_dir):
         
         print("🔍 使用 pysnooper 库进行动态分析...")
         
-        @pysnooper.snoop(os.path.join(output_dir, "pysnooper_analysis.log"), depth=1)
+        @pysnooper.snoop(str(output_path / "pysnooper_analysis.log"), depth=1)
         def analyze_contributor_patterns(authors, commits):
             """使用 pysnooper 跟踪贡献者模式分析过程"""
             # 模拟贡献者分析
             patterns = {}
             for author in set(authors):
-                author_commits = commits[authors == author]
+                author_commits = commits[commits['author'] == author].copy()
                 avg_commits_per_day = len(author_commits) / max(1, author_commits['date_only'].nunique())
                 patterns[author] = {
                     'total_commits': len(author_commits),
@@ -553,7 +583,7 @@ def analyze_commit_patterns(input_path, output_dir):
 # 📊 开源项目提交历史分析报告
 
 ## 📋 项目概览
-- **项目名称**: requests (https://github.com/psf/requests  )
+- **项目名称**: requests (https://github.com/psf/requests)
 - **分析时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - **分析范围**: 最近 {total_commits} 个提交
 - **时间跨度**: {date_range_str}
@@ -661,7 +691,7 @@ def analyze_commit_patterns(input_path, output_dir):
 
 ### 数据文件
 - 原始数据: {input_path}
-- 处理后数据: {os.path.join(output_dir, 'processed_data.csv')}
+- 处理后数据: {output_path / 'processed_data.csv'}
 
 ### 生成图表
 - weekday_distribution.png: 星期分布
@@ -676,20 +706,20 @@ def analyze_commit_patterns(input_path, output_dir):
 - pandas 版本: {pd.__version__}
 - matplotlib 版本: {plt.matplotlib.__version__}
 - 分析脚本: src/analysis.py
-- GitHub 仓库: https://github.com/psf/requests  
+- GitHub 仓库: https://github.com/psf/requests
 
 > 💡 **备注**: 本分析基于开源软件基础课程要求，使用课程讲授的开源工具进行深度分析。requests 是一个被 1,000,000+ 仓库依赖的流行库，每周下载量约 3000 万次，是研究开源项目演化的理想案例。
 """
         
         # 保存报告
-        report_path = os.path.join(output_dir, "analysis_report.md")
-        with open(report_path, 'w', encoding='utf-8') as f:
+        report_path = output_path / "analysis_report.md"
+        with open(str(report_path), 'w', encoding='utf-8') as f:
             f.write(report)
         print(f"✅ 生成: analysis_report.md")
         
         # 保存处理后的数据
-        processed_data_path = os.path.join(output_dir, "processed_data.csv")
-        df.to_csv(processed_data_path, index=False, encoding='utf-8-sig')
+        processed_data_path = output_path / "processed_data.csv"
+        df.to_csv(str(processed_data_path), index=False, encoding='utf-8-sig')
         print(f"✅ 保存处理后的数据到: {processed_data_path}")
         
         # 生成简要摘要
@@ -707,7 +737,7 @@ def analyze_commit_patterns(input_path, output_dir):
 
 完整报告见 analysis_report.md
 """
-        with open(os.path.join(output_dir, "summary.txt"), 'w', encoding='utf-8') as f:
+        with open(str(output_path / "summary.txt"), 'w', encoding='utf-8') as f:
             f.write(summary)
         print(f"✅ 生成: summary.txt")
         
@@ -717,14 +747,17 @@ def analyze_commit_patterns(input_path, output_dir):
     
     # =============== 8. 最终验证 ===============
     print(f"\n{'✅ 最终验证':-^60}")
-    generated_files = os.listdir(output_dir)
+    generated_files = list(output_path.iterdir())
     print(f"生成的文件 ({len(generated_files)}):")
     for file in generated_files:
-        file_path = os.path.join(output_dir, file)
-        print(f"  - {file} (大小: {os.path.getsize(file_path)} bytes)")
+        try:
+            file_size = file.stat().st_size
+            print(f"  - {file.name} (大小: {file_size} bytes)")
+        except Exception as e:
+            print(f"  - {file.name} (大小: 无法获取 - {str(e)})")
     
     print(f"\n{'🎉 分析完成!':-^60}")
-    print(f"结果保存在: {os.path.abspath(output_dir)}")
+    print(f"结果保存在: {output_path.resolve()}")
     print(f"建议下一步: 查看 analysis_report.md 获取详细洞察")
     
     return df
@@ -742,31 +775,15 @@ if __name__ == "__main__":
         print(f"\n{'❌ 分析失败':-^60}")
         print(f"错误: {str(e)}")
         
-        # 生成错误报告 - 修复字符串终止问题
-        error_report = (
-            "# ❌ 分析失败报告\n\n"
-            "## 错误信息\n"
-            f"{str(e)}\n\n"
-            "## 调试建议\n"
-            f"1. 检查数据文件是否存在: {INPUT_PATH}\n"
-            "2. 验证CSV文件格式是否正确（可用Excel打开）\n"
-            "3. 确保已安装所有依赖:\n"
-            "   ```\n"
-            "   pip install pandas matplotlib seaborn\n"
-            "   ```\n"
-            "4. 检查日期格式是否符合预期\n"
-            "5. 查看完整的错误堆栈跟踪\n\n"
-            "## 环境信息\n"
-            f"- 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"- Python版本: {sys.version}\n"
-            f"- 当前目录: {os.getcwd()}\n"
-        )
-        
-        # 保存错误报告
-        os.makedirs("results/analysis", exist_ok=True)
-        with open("results/analysis/error_report.md", 'w', encoding='utf-8') as f:
-            f.write(error_report)
-        print("\n📝 已生成错误报告: results/analysis/error_report.md")
-        
-        # 退出码 1 表示失败
-        sys.exit(1)
+        # 生成错误报告
+        error_report = f"""
+# ❌ 分析失败报告
+
+## 错误信息
+{str(e)}
+
+## 调试建议
+1. 检查数据文件是否存在: {INPUT_PATH}
+2. 验证CSV文件格式是否正确（可用Excel打开）
+3. 确保已安装所有依赖:
+"""
