@@ -84,6 +84,13 @@ def analyze_commit_patterns(input_path, output_dir):
     """
     分析提交模式并生成图表和报告
     """
+     # ===== 关键修复：添加类型验证 =====
+    if not isinstance(input_path, (str, os.PathLike)):
+        raise TypeError(f"input_path 必须是字符串或路径对象，而不是 {type(input_path).__name__}")
+    
+    if not isinstance(output_dir, (str, os.PathLike)):
+        raise TypeError(f"output_dir 必须是字符串或路径对象，而不是 {type(output_dir).__name__}")
+    
     # 确保输出目录存在
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -92,6 +99,11 @@ def analyze_commit_patterns(input_path, output_dir):
     print(f"输入路径: {Path(input_path).resolve()}")
     print(f"输出目录: {output_path.resolve()}")
     print(f"当前工作目录: {Path.cwd()}")
+
+     # ===== 关键修复：验证输入文件存在 =====
+    input_file = Path(input_path)
+    if not input_file.exists():
+        raise FileNotFoundError(f"❌ 数据文件不存在: {input_file.resolve()}")
     
     # =============== 0. 备份旧结果 ===============
     if output_path.exists() and any(output_path.iterdir()):
