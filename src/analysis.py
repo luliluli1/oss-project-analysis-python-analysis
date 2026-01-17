@@ -315,14 +315,16 @@ def analyze_commit_patterns(input_path, output_dir):
     # 5.1 星期分布图 - 修复 Seaborn API
     try:
         plt.figure(figsize=(12, 7))
-        # 修复：添加 hue 和 legend 参数
+        # 修复：移除无效的 legend 参数，使用新API
         ax = sns.barplot(
             x=day_counts.index, 
             y=day_counts.values, 
-            hue=day_counts.index,
-            palette="viridis",
-            legend=False
+            palette="viridis"
         )
+        
+        # 手动移除图例（如果存在）
+        if ax.get_legend():
+            ax.get_legend().remove()
         
         plt.title('提交按星期分布', fontsize=18, fontweight='bold', pad=20)
         plt.xlabel('星期', fontsize=14)
@@ -338,18 +340,31 @@ def analyze_commit_patterns(input_path, output_dir):
         save_figure(str(output_path), "weekday_distribution.png")
     except Exception as e:
         print(f"❌ 生成星期分布图失败: {str(e)}")
+        # 创建备用图表
+        try:
+            plt.figure(figsize=(10, 6))
+            plt.bar(day_counts.index, day_counts.values, color='skyblue')
+            plt.title('提交按星期分布 (备用)', fontsize=16)
+            plt.xlabel('星期', fontsize=12)
+            plt.ylabel('提交数量', fontsize=12)
+            plt.grid(axis='y', alpha=0.3)
+            save_figure(str(output_path), "weekday_distribution.png")
+        except Exception as fallback_e:
+            print(f"⚠️  备用图表也失败: {str(fallback_e)}")
     
     # 5.2 小时分布图 - 修复 Seaborn API
     try:
         plt.figure(figsize=(14, 7))
-        # 修复：添加 hue 和 legend 参数
+        # 修复：移除无效的 legend 参数
         ax = sns.barplot(
             x=hour_counts.index, 
             y=hour_counts.values, 
-            hue=hour_counts.index,
-            palette="rocket",
-            legend=False
+            palette="rocket"
         )
+        
+        # 移除图例
+        if ax.get_legend():
+            ax.get_legend().remove()
         
         # 标记工作时间和非工作时间
         work_hours = range(8, 19)  # 8AM to 6PM
@@ -373,6 +388,17 @@ def analyze_commit_patterns(input_path, output_dir):
         save_figure(str(output_path), "hourly_distribution.png")
     except Exception as e:
         print(f"❌ 生成小时分布图失败: {str(e)}")
+        # 创建备用图表
+        try:
+            plt.figure(figsize=(12, 6))
+            plt.bar(hour_counts.index, hour_counts.values, color='lightcoral')
+            plt.title('提交按小时分布 (备用)', fontsize=16)
+            plt.xlabel('小时', fontsize=12)
+            plt.ylabel('提交数量', fontsize=12)
+            plt.grid(axis='y', alpha=0.3)
+            save_figure(str(output_path), "hourly_distribution.png")
+        except Exception as fallback_e:
+            print(f"⚠️  备用图表也失败: {str(fallback_e)}")
     
     # 5.3 贡献者分布图 - 修复 Seaborn API
     try:
@@ -385,14 +411,16 @@ def analyze_commit_patterns(input_path, output_dir):
             top_authors['其他贡献者'] = other_count
         
         plt.figure(figsize=(14, 10))
-        # 修复：添加 hue 和 legend 参数
+        # 修复：移除无效的 legend 参数
         ax = sns.barplot(
             y=top_authors.index, 
             x=top_authors.values, 
-            hue=top_authors.index,
-            palette="coolwarm",
-            legend=False
+            palette="coolwarm"
         )
+        
+        # 移除图例
+        if ax.get_legend():
+            ax.get_legend().remove()
         
         plt.title('贡献者提交数量分布', fontsize=18, fontweight='bold', pad=20)
         plt.xlabel('提交数量', fontsize=14)
@@ -407,7 +435,17 @@ def analyze_commit_patterns(input_path, output_dir):
         save_figure(str(output_path), "contributors_distribution.png")
     except Exception as e:
         print(f"❌ 生成贡献者分布图失败: {str(e)}")
-    
+        # 创建备用图表
+        try:
+            plt.figure(figsize=(12, 8))
+            plt.barh(top_authors.index, top_authors.values, color='teal')
+            plt.title('贡献者提交数量分布 (备用)', fontsize=16)
+            plt.xlabel('提交数量', fontsize=12)
+            plt.ylabel('贡献者', fontsize=12)
+            plt.grid(axis='x', alpha=0.3)
+            save_figure(str(output_path), "contributors_distribution.png")
+        except Exception as fallback_e:
+            print(f"⚠️  备用图表也失败: {str(fallback_e)}")
     # 5.4 月度趋势图
     try:
         plt.figure(figsize=(16, 9))
