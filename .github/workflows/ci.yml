@@ -22,10 +22,10 @@ jobs:
         submodules: false
         persist-credentials: false
 
-    - name: Configure encoding
+    - name: Configure system encoding
       run: |
         chcp 65001
-        echo "INFO: System encoding set to UTF-8"
+        echo "INFO: UTF-8 encoding enabled"
       shell: powershell
 
     - name: Set up Python
@@ -43,7 +43,7 @@ jobs:
         pip install pytest pytest-cov pytest-html coverage GitPython
       shell: powershell
 
-    - name: Create directories
+    - name: Create required directories
       run: |
         mkdir -p data\repos
         mkdir -p reports\test\coverage
@@ -70,52 +70,12 @@ jobs:
         $coverageReport = "reports\test\coverage\index.html"
         
         if (-not (Test-Path $htmlReport)) {
-@"
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Test Report</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 40px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .header { background: #e3f2fd; padding: 20px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Test Report (Fallback)</h1>
-      <p>Time: $(Get-Date)</p>
-    </div>
-  </div>
-</body>
-</html>
-"@ | Out-File $htmlReport -Encoding utf8
+          "<!DOCTYPE html><html><head><title>Test Report</title><style>body{font-family:Arial,sans-serif;margin:40px;}.container{max-width:800px;margin:0 auto;}.header{background:#e3f2fd;padding:20px;border-radius:4px;}</style></head><body><div class='container'><div class='header'><h1>Test Report (Fallback)</h1><p>Time: $(Get-Date)</p></div></div></body></html>" | Out-File $htmlReport -Encoding utf8
         }
         
         if (-not (Test-Path $coverageReport)) {
           mkdir -p reports\test\coverage -Force
-@"
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Coverage Report</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 40px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .header { background: #ffebee; padding: 20px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Coverage Report (Fallback)</h1>
-      <p>Time: $(Get-Date)</p>
-    </div>
-  </div>
-</body>
-</html>
-"@ | Out-File $coverageReport -Encoding utf8
+          "<!DOCTYPE html><html><head><title>Coverage Report</title><style>body{font-family:Arial,sans-serif;margin:40px;}.container{max-width:800px;margin:0 auto;}.header{background:#ffebee;padding:20px;border-radius:4px;}</style></head><body><div class='container'><div class='header'><h1>Coverage Report (Fallback)</h1><p>Time: $(Get-Date)</p></div></div></body></html>" | Out-File $coverageReport -Encoding utf8
         }
       shell: powershell
 

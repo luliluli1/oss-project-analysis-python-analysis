@@ -3,19 +3,18 @@ import os
 import sys
 
 def setup_requests_repo():
-    """Clone requests repository at runtime"""
     repo_path = "data/repos/requests"
     
     if os.path.exists(repo_path):
         print("INFO: requests repository already exists, skipping clone")
         return
     
-    print("INFO: Cloning requests repository with special parameters...")
+    print("INFO: Cloning requests repository with knowledge base parameter...")
     
     os.makedirs(repo_path, exist_ok=True)
     
     try:
-        # Apply special parameter from documentation to handle bad timestamp
+        # 根据知识库要求：使用特殊参数避免时间戳错误
         repo = git.Repo.clone_from(
             "https://github.com/psf/requests.git",
             repo_path,
